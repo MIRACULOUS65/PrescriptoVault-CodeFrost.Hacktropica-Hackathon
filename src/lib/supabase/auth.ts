@@ -17,7 +17,7 @@ export interface AuthResponse {
     success: boolean;
     error?: string;
     user?: SupabaseUser;
-    profile?: UserProfile;
+    profile?: UserProfile | null;
 }
 
 /**
@@ -75,21 +75,24 @@ export async function updateUserRole(userId: string, role: UserRole): Promise<Au
     try {
         console.log('🔧 updateUserRole called with:', { userId, role });
 
+        // Use upsert instead of update to handle cases where the profile row doesn't exist yet
         const { data, error } = await supabase
             .from('users')
-            .update({ role, updated_at: new Date().toISOString() })
-            .eq('id', userId)
+            .upsert(
+                { id: userId, role, updated_at: new Date().toISOString() },
+                { onConflict: 'id' }
+            )
             .select()
             .single();
 
-        console.log('📊 Supabase update result:', { data, error });
+        console.log('📊 Supabase upsert result:', { data, error });
 
         if (error) {
-            console.error('❌ Supabase update error:', error);
+            console.error('❌ Supabase upsert error:', error);
             return { success: false, error: error.message };
         }
 
-        console.log('✅ Role updated successfully:', data);
+        console.log('✅ Role updated successfully via upsert:', data);
         return { success: true, profile: data as UserProfile };
     } catch (error: any) {
         console.error('❌ Caught exception in updateUserRole:', error);
@@ -112,6 +115,11 @@ export async function getUserProfile(userId: string): Promise<AuthResponse> {
         console.log('📋 getUserProfile query result:', { data, error });
 
         if (error) {
+            // Handle PGRST116: The result contains 0 rows
+            if (error.code === 'PGRST116') {
+                console.warn('⚠️ getUserProfile: No profile found for user:', userId);
+                return { success: true, profile: null };
+            }
             console.error('❌ getUserProfile error:', error);
             return { success: false, error: error.message };
         }

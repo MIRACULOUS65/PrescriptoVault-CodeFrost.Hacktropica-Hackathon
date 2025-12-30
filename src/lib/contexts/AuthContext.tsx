@@ -29,11 +29,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await getUserProfile(userId);
             console.log('📋 Profile response:', response);
 
-            if (response.success && response.profile) {
-                console.log('✅ Profile loaded:', response.profile);
-                setProfile(response.profile);
+            if (response.success) {
+                if (response.profile) {
+                    console.log('✅ Profile loaded:', response.profile);
+                    setProfile(response.profile);
+                } else {
+                    console.log('⚠️ No profile found for user');
+                    setProfile(null);
+                }
             } else {
                 console.error('❌ Failed to load profile:', response.error);
+                setProfile(null);
             }
         } catch (err) {
             console.error('❌ Error fetching profile:', err);
