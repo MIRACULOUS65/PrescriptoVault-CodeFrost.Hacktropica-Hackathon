@@ -118,7 +118,7 @@ export function ReorderDialog({ item, open, onOpenChange }: ReorderDialogProps) 
                                 <div className="w-full max-w-md space-y-2 text-center">
                                     <h3 className="text-xl font-semibold text-white">Scanning Provider Network...</h3>
                                     <p className="text-emerald-100/60 text-sm">Finding best prices and availability in real-time</p>
-                                    <Progress value={searchProgress} className="h-2 bg-emerald-950/50" indicatorClassName="bg-emerald-500" />
+                                    <Progress value={searchProgress} className="h-2 bg-emerald-950/50" />
                                 </div>
                             </motion.div>
                         )}

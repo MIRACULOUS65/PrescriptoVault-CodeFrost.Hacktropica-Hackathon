@@ -2,7 +2,6 @@
 
 import { Navigation } from '@/components/shared/Navigation';
 import SyntheticHero from '@/components/ui/synthetic-hero';
-import FeaturesSection from '@/components/landing/FeaturesSection';
 
 export default function LandingPage() {
   return (
@@ -31,8 +30,6 @@ export default function LandingPage() {
           "Real-time Validator Node",
         ]}
       />
-
-      <FeaturesSection />
     </main>
   );
 }

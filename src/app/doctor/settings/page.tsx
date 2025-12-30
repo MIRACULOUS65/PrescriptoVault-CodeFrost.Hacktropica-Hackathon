@@ -5,9 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { User, Mail, Phone, Building2, Bell, Shield, Save } from "lucide-react";
+import { User, Mail, Phone, Building2, Bell, Shield, Save, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
+    const router = useRouter();
+
+    const handleLogout = () => {
+        // Clear any stored data if needed
+        localStorage.clear();
+        // Redirect to homepage
+        router.push('/');
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -152,6 +162,28 @@ export default function SettingsPage() {
                             Change Password
                         </Button>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Logout Section */}
+            <Card className="bg-black/40 backdrop-blur-xl border-red-500/20">
+                <CardHeader>
+                    <CardTitle className="text-white flex items-center gap-2">
+                        <LogOut className="h-5 w-5 text-red-400" />
+                        Logout
+                    </CardTitle>
+                    <CardDescription className="text-emerald-100/40">
+                        Sign out of your account and return to homepage
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button
+                        onClick={handleLogout}
+                        className="bg-red-500 hover:bg-red-600 text-white font-semibold"
+                    >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout from Doctor Portal
+                    </Button>
                 </CardContent>
             </Card>
         </div>

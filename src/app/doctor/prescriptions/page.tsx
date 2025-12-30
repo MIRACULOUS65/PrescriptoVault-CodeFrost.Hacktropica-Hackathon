@@ -31,7 +31,9 @@ export default function PrescriptionsPage() {
                                         <CardTitle className="text-white flex items-center gap-2">
                                             {patient?.name || "Unknown Patient"}
                                             {rx.txHash && (
-                                                <Shield className="h-4 w-4 text-emerald-400" title="Blockchain verified" />
+                                                <span title="Blockchain verified">
+                                                    <Shield className="h-4 w-4 text-emerald-400" />
+                                                </span>
                                             )}
                                         </CardTitle>
                                         <p className="text-sm text-emerald-100/60 mt-1">Prescription #{rx.id}</p>
