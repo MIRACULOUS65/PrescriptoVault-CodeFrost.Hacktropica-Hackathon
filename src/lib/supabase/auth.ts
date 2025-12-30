@@ -71,15 +71,20 @@ export async function verifyOTP(email: string, token: string): Promise<AuthRespo
 /**
  * Update user's role in the database
  */
-export async function updateUserRole(userId: string, role: UserRole): Promise<AuthResponse> {
+export async function updateUserRole(userId: string, role: UserRole, email?: string): Promise<AuthResponse> {
     try {
-        console.log('🔧 updateUserRole called with:', { userId, role });
+        console.log('🔧 updateUserRole called with:', { userId, role, email });
 
         // Use upsert instead of update to handle cases where the profile row doesn't exist yet
         const { data, error } = await supabase
             .from('users')
             .upsert(
-                { id: userId, role, updated_at: new Date().toISOString() },
+                {
+                    id: userId,
+                    role,
+                    updated_at: new Date().toISOString(),
+                    ...(email ? { email } : {})
+                },
                 { onConflict: 'id' }
             )
             .select()

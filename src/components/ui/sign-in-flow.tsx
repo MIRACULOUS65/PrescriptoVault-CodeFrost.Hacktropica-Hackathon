@@ -320,7 +320,7 @@ export const SignInFlow = ({ className, mode = "signin" }: SignInFlowProps) => {
 
                     // Update user role in database
                     if (selectedRole) {
-                        const roleResponse = await updateUserRole(verifyResponse.user.id, selectedRole);
+                        const roleResponse = await updateUserRole(verifyResponse.user.id, selectedRole, email);
 
                         if (!roleResponse.success) {
                             setError(roleResponse.error || "Failed to set role");
