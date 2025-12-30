@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Stethoscope, Users, Building2, Shield, ArrowRight } from "lucide-react";
+import { Stethoscope, Users, Building2, Shield, ArrowRight, Loader2 } from "lucide-react";
 import * as THREE from "three";
+import { signInWithEmail, verifyOTP, updateUserRole, type UserRole } from "@/lib/supabase/auth";
 
 type Uniforms = {
     [key: string]: {
@@ -26,8 +27,6 @@ interface SignInFlowProps {
     className?: string;
     mode?: "signin" | "signup";
 }
-
-type UserRole = "doctor" | "patient" | "pharmacy" | null;
 
 // Canvas Reveal Effect Component
 export const CanvasRevealEffect = ({
@@ -238,11 +237,14 @@ export const SignInFlow = ({ className, mode = "signin" }: SignInFlowProps) => {
     const router = useRouter();
     const [email, setEmail] = useState("");
     const [step, setStep] = useState<"email" | "role" | "code" | "success">("email");
-    const [selectedRole, setSelectedRole] = useState<UserRole>(null);
-    const [code, setCode] = useState(["", "", "", "", "", ""]);
+    const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+    const [code, setCode] = useState(["", "", "", "", "", "", "", ""]);
     const codeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
     const [initialCanvasVisible, setInitialCanvasVisible] = useState(true);
     const [reverseCanvasVisible, setReverseCanvasVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [userId, setUserId] = useState<string | null>(null);
 
     const roles = [
         { id: "doctor" as const, title: "Doctor", description: "Prescribe & manage patients", icon: Stethoscope, color: "from-blue-500/20 to-blue-600/20" },
@@ -250,15 +252,33 @@ export const SignInFlow = ({ className, mode = "signin" }: SignInFlowProps) => {
         { id: "pharmacy" as const, title: "Pharmacy", description: "Verify & dispense", icon: Building2, color: "from-purple-500/20 to-purple-600/20" },
     ];
 
-    const handleEmailSubmit = (e: React.FormEvent) => {
+    const handleEmailSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (email) {
+        if (!email) return;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const response = await signInWithEmail(email);
+
+            if (!response.success) {
+                setError(response.error || "Failed to send verification email");
+                return;
+            }
+
+            // Move to role selection after email sent
             setStep("role");
+        } catch (err: any) {
+            setError(err.message || "An error occurred");
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleRoleSelect = (role: UserRole) => {
+    const handleRoleSelect = (role: UserRole | null) => {
         setSelectedRole(role);
+        setError(null);
         setTimeout(() => setStep("code"), 300);
     };
 
@@ -268,17 +288,78 @@ export const SignInFlow = ({ className, mode = "signin" }: SignInFlowProps) => {
         }
     }, [step]);
 
-    const handleCodeChange = (index: number, value: string) => {
+    const handleCodeChange = async (index: number, value: string) => {
         if (value.length <= 1) {
             const newCode = [...code];
             newCode[index] = value;
             setCode(newCode);
-            if (value && index < 5) codeInputRefs.current[index + 1]?.focus();
-            if (index === 5 && value && newCode.every(digit => digit.length === 1)) {
-                setReverseCanvasVisible(true);
-                setTimeout(() => setInitialCanvasVisible(false), 50);
-                setTimeout(() => setStep("success"), 2000);
-                setTimeout(() => router.push(`/${selectedRole}`), 3000);
+
+            if (value && index < 7) {
+                codeInputRefs.current[index + 1]?.focus();
+            }
+
+            // When all 8 digits entered
+            if (index === 7 && value && newCode.every(digit => digit.length === 1)) {
+                setIsLoading(true);
+                setError(null);
+                const otpCode = newCode.join("");
+
+                try {
+                    // Verify OTP with Supabase
+                    const verifyResponse = await verifyOTP(email, otpCode);
+
+                    if (!verifyResponse.success || !verifyResponse.user) {
+                        setError(verifyResponse.error || "Invalid verification code");
+                        setCode(["", "", "", "", "", "", "", ""]);
+                        codeInputRefs.current[0]?.focus();
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    setUserId(verifyResponse.user.id);
+
+                    // Update user role in database
+                    if (selectedRole) {
+                        const roleResponse = await updateUserRole(verifyResponse.user.id, selectedRole);
+
+                        if (!roleResponse.success) {
+                            setError(roleResponse.error || "Failed to set role");
+                            setIsLoading(false);
+                            return;
+                        }
+                    }
+
+                    // Check if user is already verified (returning user)
+                    const { getUserProfile } = await import('@/lib/supabase/auth');
+                    const profileResponse = await getUserProfile(verifyResponse.user.id);
+                    const isAlreadyVerified = profileResponse.success && profileResponse.profile?.verified;
+                    const userRole = profileResponse.profile?.role || selectedRole;
+
+                    console.log('📋 Profile check:', { isAlreadyVerified, userRole });
+
+                    // Show success animation
+                    setReverseCanvasVisible(true);
+                    setTimeout(() => setInitialCanvasVisible(false), 50);
+                    setTimeout(() => setStep("success"), 1000);
+
+                    // Redirect based on verification status
+                    setTimeout(() => {
+                        if (isAlreadyVerified && userRole) {
+                            console.log('✅ Already verified! Redirecting to portal:', userRole);
+                            window.location.href = `/${userRole}`;
+                        } else {
+                            console.log('🔒 Not verified, redirecting to wallet verification...');
+                            window.location.href = '/verify-wallet';
+                        }
+                    }, 1500);
+
+                } catch (err: any) {
+                    setError(err.message || "An error occurred");
+                    setCode(["", "", "", "", "", "", "", ""]);
+                    codeInputRefs.current[0]?.focus();
+                } finally {
+                    setIsLoading(false);
+                }
             }
         }
     };
@@ -310,9 +391,9 @@ export const SignInFlow = ({ className, mode = "signin" }: SignInFlowProps) => {
                 <div className="flex flex-1 flex-col justify-center items-center px-4">
                     <div className="w-full max-w-md mt-20">
                         <AnimatePresence mode="wait">
-                            {step === "email" && <EmailStep email={email} setEmail={setEmail} handleSubmit={handleEmailSubmit} mode={mode} />}
+                            {step === "email" && <EmailStep email={email} setEmail={setEmail} handleSubmit={handleEmailSubmit} mode={mode} isLoading={isLoading} error={error} />}
                             {step === "role" && <RoleStep roles={roles} onSelect={handleRoleSelect} onBack={() => setStep("email")} />}
-                            {step === "code" && <CodeStep code={code} codeInputRefs={codeInputRefs} handleCodeChange={handleCodeChange} handleKeyDown={handleKeyDown} onBack={() => setStep("role")} />}
+                            {step === "code" && <CodeStep code={code} codeInputRefs={codeInputRefs} handleCodeChange={handleCodeChange} handleKeyDown={handleKeyDown} onBack={() => setStep("role")} isLoading={isLoading} error={error} email={email} />}
                             {step === "success" && <SuccessStep />}
                         </AnimatePresence>
                     </div>
@@ -323,7 +404,7 @@ export const SignInFlow = ({ className, mode = "signin" }: SignInFlowProps) => {
 };
 
 // Email Step Component
-const EmailStep = ({ email, setEmail, handleSubmit, mode }: any) => {
+const EmailStep = ({ email, setEmail, handleSubmit, mode, isLoading, error }: any) => {
     const router = useRouter();
 
     return (
@@ -337,11 +418,32 @@ const EmailStep = ({ email, setEmail, handleSubmit, mode }: any) => {
             </div>
             <div className="space-y-4">
                 <form onSubmit={handleSubmit} className="relative">
-                    <input type="email" placeholder="your.email@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full backdrop-blur-[1px] bg-emerald-950/10 text-white border border-emerald-500/20 rounded-full py-3 px-4 focus:outline-none focus:border-emerald-500/40 text-center placeholder:text-emerald-100/30" required />
-                    <button type="submit" className="absolute right-1.5 top-1.5 text-white w-9 h-9 flex items-center justify-center rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors">
-                        <ArrowRight className="h-4 w-4" />
+                    <input
+                        type="email"
+                        placeholder="your.email@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full backdrop-blur-[1px] bg-emerald-950/10 text-white border border-emerald-500/20 rounded-full py-3 px-4 focus:outline-none focus:border-emerald-500/40 text-center placeholder:text-emerald-100/30"
+                        required
+                        disabled={isLoading}
+                    />
+                    <button
+                        type="submit"
+                        className="absolute right-1.5 top-1.5 text-white w-9 h-9 flex items-center justify-center rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
                     </button>
                 </form>
+                {error && (
+                    <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-red-400 mt-2"
+                    >
+                        {error}
+                    </motion.p>
+                )}
             </div>
             <p className="text-xs text-emerald-100/30 pt-10">Secured by blockchain technology</p>
 
@@ -390,19 +492,47 @@ const RoleStep = ({ roles, onSelect, onBack }: any) => (
 );
 
 // Code Step Component
-const CodeStep = ({ code, codeInputRefs, handleCodeChange, handleKeyDown, onBack }: any) => (
+const CodeStep = ({ code, codeInputRefs, handleCodeChange, handleKeyDown, onBack, isLoading, error, email }: any) => (
     <motion.div key="code-step" initial={{ opacity: 0, x: 100 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 100 }} transition={{ duration: 0.4 }} className="space-y-6 text-center">
         <div className="space-y-1">
             <h1 className="text-3xl font-bold text-white">Verification Code</h1>
-            <p className="text-emerald-100/60">Enter the 6-digit code sent to your email</p>
+            <p className="text-emerald-100/60">Enter the 8-digit code sent to</p>
+            <p className="text-emerald-400 text-sm font-medium">{email}</p>
         </div>
         <div className="relative rounded-full py-4 px-5 border border-emerald-500/20 bg-emerald-950/5">
             <div className="flex items-center justify-center gap-2">
                 {code.map((digit: string, i: number) => (
-                    <input key={i} ref={(el) => { codeInputRefs.current[i] = el; }} type="text" inputMode="numeric" pattern="[0-9]*" maxLength={1} value={digit} onChange={e => handleCodeChange(i, e.target.value)} onKeyDown={e => handleKeyDown(i, e)} className="w-10 h-12 text-center text-xl bg-transparent text-white border-b-2 border-emerald-500/30 focus:border-emerald-400 focus:outline-none" style={{ caretColor: 'transparent' }} />
+                    <input
+                        key={i}
+                        ref={(el) => { codeInputRefs.current[i] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        value={digit}
+                        onChange={e => handleCodeChange(i, e.target.value)}
+                        onKeyDown={e => handleKeyDown(i, e)}
+                        className="w-10 h-12 text-center text-xl bg-transparent text-white border-b-2 border-emerald-500/30 focus:border-emerald-400 focus:outline-none disabled:opacity-50"
+                        style={{ caretColor: 'transparent' }}
+                        disabled={isLoading}
+                    />
                 ))}
             </div>
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
+                    <Loader2 className="h-5 w-5 text-emerald-400 animate-spin" />
+                </div>
+            )}
         </div>
+        {error && (
+            <motion.p
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm text-red-400 text-center"
+            >
+                {error}
+            </motion.p>
+        )}
         <button onClick={onBack} className="w-full py-3 rounded-full border border-emerald-500/20 text-emerald-100/60 hover:text-white hover:border-emerald-500/40 transition-colors">
             Back
         </button>
