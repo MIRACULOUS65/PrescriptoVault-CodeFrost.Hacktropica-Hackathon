@@ -26,7 +26,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const fetchAndSetProfile = async (userId: string) => {
         console.log('📂 Fetching profile for user:', userId);
         try {
-            const response = await getUserProfile(userId);
+            // Create a timeout promise that rejects after 5 seconds
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Profile fetch timed out')), 5000);
+            });
+
+            // Race the profile fetch against the timeout
+            const response = await Promise.race([
+                getUserProfile(userId),
+                timeoutPromise
+            ]) as any;
+
             console.log('📋 Profile response:', response);
 
             if (response.success) {
@@ -43,6 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (err) {
             console.error('❌ Error fetching profile:', err);
+            // Don't set profile to null here if we want to retry? 
+            // Better to allow UI to show something than hang forever.
+            setProfile(null);
         } finally {
             setProfileLoaded(true);
         }
