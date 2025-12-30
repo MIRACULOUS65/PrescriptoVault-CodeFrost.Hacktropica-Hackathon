@@ -4,11 +4,11 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Shield, Ban, Activity, Users, Building2, Stethoscope, TrendingUp, Zap } from 'lucide-react';
+import { Shield, Ban, Activity, Users, Building2, Stethoscope, TrendingUp, Zap, type LucideIcon } from 'lucide-react';
 import { mockNetworkStats } from '@/lib/mockDb';
 
 interface StatCardProps {
-    icon: React.ElementType;
+    icon: LucideIcon;
     label: string;
     value: number;
     suffix?: string;
