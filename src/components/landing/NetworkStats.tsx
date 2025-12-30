@@ -167,7 +167,7 @@ function StatCard({
 }
 
 export function NetworkStats() {
-    const stats = [
+    const stats: StatCardProps[] = [
         {
             icon: Shield,
             label: 'Total Assets Secured',
