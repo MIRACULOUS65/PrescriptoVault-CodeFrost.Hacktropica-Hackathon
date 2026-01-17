@@ -4,6 +4,13 @@
 ## 🌟 Project Overview
 PrescriptoVault is a sophisticated, "Database-Ready" healthcare platform designed to modernize the prescription lifecycle. It connects **Doctors**, **Patients**, **Pharmacies**, and **Administrators** in a unified, secure ecosystem.
 
+## 🎥 Project Demo
+
+[![Prescipto Vault Demo Video](./public/Screenshot.png)](https://drive.google.com/file/d/1DOGz03AKzrarQNmJU6y4ajnpKsZALy_A/view?usp=sharing)
+
+▶️ **[Watch Demo Video on Google Drive](https://drive.google.com/file/d/1DOGz03AKzrarQNmJU6y4ajnpKsZALy_A/view?usp=sharing)**
+
+
 ### Key Technology Stack
 *   **Frontend**: Next.js 14, React 18
 *   **Styling**: Tailwind CSS, Shadcn UI
